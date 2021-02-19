@@ -1,0 +1,7 @@
+* {box-sizing:border-box}
+
+
+#map-area:hover {
+    fill: blue;
+}
+
