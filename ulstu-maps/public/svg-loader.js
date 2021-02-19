@@ -1,10 +1,32 @@
 
 
 class SVGDomStruct {
+    
+    // Храним ID элемента <object />
+    // 
+    // <object id =... />
     objectID;
+
+    // Храним DOM структуру <object />
+    // 
+    // <object />
     objectElement;
+
+    // Храним ID элемента <svg />
+    // 
+    // <svg id =... />
     idSvgDocument;
+
+    // Храним Имя Класса элементов
+    // в дереве svg отображающие кабинеты, кампусы и т.д.
+    // 
+    // <ellipse class=... />
     classNameSvgElement;
+
+    // Храним ID элементов, в виде массива, которые
+    // в дереве svg отображают кабинеты, кампусы и т.д.
+    //
+    // <ellipse class=... id =... />
     listIdSvgElements;
 }
 
@@ -16,38 +38,38 @@ class SVGLoader {
     // Храним DOM структуру, контейнера SVG файлов.
     //
     // <div />
-    #mapsContainer;
+    #campusDivContainer;
 
     // private
     //
-    // Храним по ключу ID элемента object, по значению DOM структуру object.
+    // Храним по ключу ID элемента Object SVGDomStruct, по значению DOM структуру <object />.
     //
-    // Map -> { "objectID" : <object />}
-    #objectAndSVG;
+    // Map -> { "objectID" : Object SVGDomStruct}
+    #structAndSVG;
 
     // private
     //
     // Храним привязку элемента управления (radio, button и т.д.),
     // загружающего SVG и сам SVG.
-    // По ключу ID элемента управления, по значению DOM структуру object.
+    // По ключу ID элемента управления, по значению DOM структуру Object SVGDomStruct.
     //
-    // Map -> { "selectorID" : <object />}
-    #domSelectorAndSVG;
+    // Map -> { "selectorID" : Object SVGDomStruct}
+    #selectorAndSVG;
 
     constructor() {
-        this.#mapsContainer = document.getElementsByClassName(ClassNameSvgContainer);
-        this.#objectAndSVG = new Map();
-        this.#domSelectorAndSVG = new Map();
+        this.#campusDivContainer = document.getElementsByClassName(ClassNameSvgContainer);
+        this.#structAndSVG = new Map();
+        this.#selectorAndSVG = new Map();
         this.#findAllSvgObjects();
     }
 
-    // Вешаем события на элементы DOM дерева SVG
+    // Находим все элементы <object /> одержащие элементы <svg />
     //
     #findAllSvgObjects() {
-        for (let map = 0; map < this.#mapsContainer.length; map++) {
-            let objectID = this.#mapsContainer.item(map).children[0].id;
+        for (let map = 0; map < this.#campusDivContainer.length; map++) {
+            let objectID = this.#campusDivContainer.item(map).children[0].id;
             let objectElement = document.getElementById(objectID);
-            this.#objectAndSVG.set(objectID, SVGLoader.createSvgDomStruct(
+            this.#structAndSVG.set(objectID, SVGLoader.createSvgDomStruct(
                 objectID,
                 objectElement,
                 null,
@@ -57,53 +79,58 @@ class SVGLoader {
         }
     };
 
+
+    // Вешаем события на элементы SVG, которые показывают кабинеты, каспусы и т.д.
+    //
     #addEventOnSvgElements(objectElement, objectID) {
         objectElement.addEventListener("load", () => {
             let idSvgDocument = objectElement.contentDocument.children[0].id;
             let listIdSvgElements = [];
             let svgDom = objectElement.contentDocument.getElementsByClassName(ClassNameSvgElement);
             for (let areaIndex = 0; areaIndex < svgDom.length; areaIndex++) {
-                let mapAreaElement = svgDom.item(areaIndex);
-                listIdSvgElements.push(mapAreaElement.id);
-                mapAreaElement.addEventListener("mousedown", () => {
-                    mapAreaElement.style.fill = "#ffe615";
-                    let json = JSON.parse(SVGLoader.getAboutMapArea(idSvgDocument, mapAreaElement.id));
-                    SVGLoader.addAreaDescription(json);
+
+                let SVGElementShowingArea = svgDom.item(areaIndex);
+                listIdSvgElements.push(SVGElementShowingArea.id);
+
+                SVGElementShowingArea.addEventListener("mousedown", () => {
+                    SVGElementShowingArea.style.fill = "#ffe615";
+                    let json = JSON.parse(SVGLoader.getAboutMapArea(idSvgDocument, SVGElementShowingArea.id));
+                    SVGLoader.fillAboutBlockFields(json);
                 });
-                mapAreaElement.addEventListener("mouseup", () => {
-                    mapAreaElement.style.fill = "#ffffff";
-                    SVGLoader.clearAreaDescription();
+                SVGElementShowingArea.addEventListener("mouseup", () => {
+                    SVGElementShowingArea.style.fill = "#ffffff";
+                    SVGLoader.clearAboutBlockFields();
                 });
             }
-            let svgDomStruct = this.#objectAndSVG.get(objectID);
+            let svgDomStruct = this.#structAndSVG.get(objectID);
             svgDomStruct.idSvgDocument = idSvgDocument;
             svgDomStruct.listIdSvgElements = listIdSvgElements;
-            this.#objectAndSVG.set(objectID, svgDomStruct);
+            this.#structAndSVG.set(objectID, svgDomStruct);
         });
     }
-
-
 
     // Выполнить связывание элементов управления,
     // с object'ами содержащий SVG.
     //
     addMatchesSelectorWithSVG(firstWordSelectorID) {
-        for (const [key, value] of this.#objectAndSVG) {
+        for (const [key, value] of this.#structAndSVG) {
             let identifier = key.replace("object", "");
             let partsOfName = [firstWordSelectorID, identifier];
-            let selectorDomID = partsOfName.join("");
-            this.#domSelectorAndSVG.set(selectorDomID, value);
+            let selectorID = partsOfName.join("");
+            this.#selectorAndSVG.set(selectorID, value);
         }
     }
 
+    // Переключение между картами капмусов.
+    //
     showSvgBySelector(selectorId) {
-        for (const [key, value] of this.#domSelectorAndSVG) {
-            console.log(value);
-            let mapContainer = value.objectElement.parentNode;
-            if (key === selectorId) {
-                mapContainer.style.display = "block";
+        for (const [selectorKey, svgDomStruct] of this.#selectorAndSVG) {
+            console.log(svgDomStruct);
+            let divCampusContainer = svgDomStruct.objectElement.parentNode;
+            if (selectorKey === selectorId) {
+                divCampusContainer.style.display = "block";
             } else {
-                mapContainer.style.display = "none";
+                divCampusContainer.style.display = "none";
             }
         }
     }
@@ -134,7 +161,9 @@ class SVGLoader {
         return request.response;
     }
 
-    static addAreaDescription(json) {
+    // Заполни информацией поля блока "About"
+    //
+    static fillAboutBlockFields(json) {
         ListElementIDinAboutAreaBlock.forEach(
             elementId =>
                 Object.keys(json).forEach(function (key, index) {
@@ -146,7 +175,9 @@ class SVGLoader {
         );
     }
 
-    static clearAreaDescription() {
+    // Очисти информацией поля блока "About"
+    //
+    static clearAboutBlockFields() {
         ListElementIDinAboutAreaBlock.forEach(
             elementId =>
                 document.getElementById(elementId).value = ""
